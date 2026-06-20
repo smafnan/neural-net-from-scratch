@@ -1,0 +1,14 @@
+{
+  "dataset": "mnist",
+  "architecture": [
+    784,
+    128,
+    64,
+    10
+  ],
+  "epochs": 20,
+  "lr": 0.1,
+  "batch_size": 128,
+  "test_accuracy": 0.9767142857142858,
+  "final_train_loss": 0.018268787396484923
+}

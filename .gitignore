@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# scikit-learn / OpenML dataset cache (MNIST is downloaded at runtime)
+scikit_learn_data/
+
+# Figures + metrics ARE committed so results render on GitHub.
