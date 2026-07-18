@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
-from src.nn import Dense, ReLU, MLP, load_dataset, one_hot
+from nn import Dense, ReLU, MLP, load_dataset, one_hot
 
 
 def build_mlp(n_features: int, hidden: list[int], n_classes: int) -> MLP:
