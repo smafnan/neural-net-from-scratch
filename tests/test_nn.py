@@ -113,3 +113,26 @@ def test_predict_shapes():
     net = MLP([Dense(4, 5, seed=1), ReLU(), Dense(5, 3, seed=2)])
     assert net.predict(X).shape == (7,)
     assert net.predict_proba(X).shape == (7, 3)
+
+
+# --------------------------------------------------------------------------- #
+# Persistence
+# --------------------------------------------------------------------------- #
+
+def test_mlp_save_load_round_trip(tmp_path):
+    """A loaded model must reproduce the exact predictions of the original."""
+    rng = np.random.default_rng(4)
+    X = rng.normal(size=(6, 5))
+    net = MLP([Dense(5, 7, seed=1), ReLU(), Dense(7, 3, seed=2)])
+    expected = net.predict_proba(X)
+
+    path = tmp_path / "model.npz"
+    net.save(path)
+    assert path.exists()
+
+    loaded = MLP.load(path)
+    assert np.allclose(loaded.predict_proba(X), expected)
+    for orig_layer, loaded_layer in zip(net.layers, loaded.layers):
+        if hasattr(orig_layer, "W"):
+            assert np.array_equal(orig_layer.W, loaded_layer.W)
+            assert np.array_equal(orig_layer.b, loaded_layer.b)

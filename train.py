@@ -17,8 +17,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
 
 from nn import Dense, ReLU, MLP, load_dataset, one_hot
+from nn.data import RANDOM_STATE
 
 
 def build_mlp(n_features: int, hidden: list[int], n_classes: int) -> MLP:
@@ -42,20 +44,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-mnist", action="store_true",
                         help="Skip the MNIST download and use sklearn digits.")
     parser.add_argument("--output-dir", type=Path, default=Path("reports"))
+    parser.add_argument("--model-path", type=Path, default=None,
+                        help="Where to save trained weights (default: "
+                             "<output-dir>/model.npz).")
+    parser.add_argument("--load-model", action="store_true",
+                        help="Load weights from --model-path instead of training, "
+                             "then just evaluate + write figures.")
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    model_path = args.model_path or (args.output_dir / "model.npz")
 
     print("1) Loading data ...")
     X_train, X_test, y_train, y_test, meta = load_dataset(prefer_mnist=not args.no_mnist)
     print(f"   dataset={meta['name']}  features={meta['n_features']}  "
           f"classes={meta['n_classes']}  train={len(X_train)}  test={len(X_test)}")
 
-    y_train_oh = one_hot(y_train, meta["n_classes"])
+    if args.load_model:
+        print(f"2) Loading trained weights from {model_path} ...")
+        net = MLP.load(model_path)
+    else:
+        # Hold out a small validation slice from the *training* data (never
+        # the test set) so per-epoch progress doesn't leak test information.
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_train, y_train, test_size=0.1, random_state=RANDOM_STATE, stratify=y_train
+        )
+        y_train_oh = one_hot(y_train, meta["n_classes"])
 
-    print(f"2) Training MLP {[meta['n_features'], *args.hidden, meta['n_classes']]} ...")
-    net = build_mlp(meta["n_features"], args.hidden, meta["n_classes"])
-    net.fit(X_train, y_train_oh, epochs=args.epochs, batch_size=args.batch_size,
-            lr=args.lr, X_val=X_test, y_val=y_test, verbose=True)
+        print(f"2) Training MLP {[meta['n_features'], *args.hidden, meta['n_classes']]} ...")
+        net = build_mlp(meta["n_features"], args.hidden, meta["n_classes"])
+        net.fit(X_train, y_train_oh, epochs=args.epochs, batch_size=args.batch_size,
+                lr=args.lr, X_val=X_val, y_val=y_val, verbose=True)
+
+        net.save(model_path)
+        print(f"   Trained weights saved to {model_path}")
 
     test_acc = net.score(X_test, y_test)
     print(f"\n3) Final test accuracy: {test_acc:.4f}")
@@ -68,12 +89,14 @@ def main(argv: list[str] | None = None) -> int:
     _plot_mistakes(X_test, y_test, y_pred, meta["image_shape"],
                    args.output_dir / "mistakes.png")
 
+    architecture = [meta["n_features"],
+                    *(layer.b.shape[0] for layer in net.layers if hasattr(layer, "W"))]
     (args.output_dir / "metrics.json").write_text(json.dumps({
         "dataset": meta["name"],
-        "architecture": [meta["n_features"], *args.hidden, meta["n_classes"]],
+        "architecture": architecture,
         "epochs": args.epochs, "lr": args.lr, "batch_size": args.batch_size,
         "test_accuracy": float(test_acc),
-        "final_train_loss": net.history_["loss"][-1],
+        "final_train_loss": net.history_["loss"][-1] if net.history_["loss"] else None,
     }, indent=2), encoding="utf-8")
     print(f"   Figures + metrics written to {args.output_dir}/")
     return 0
